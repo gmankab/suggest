@@ -160,6 +160,40 @@ token: {config['token']}
     )
 
 
+def make_config():
+    create_new_config = False
+
+    def check_val(
+        key: str,
+        comment: str,
+        val: any = None,
+    ):
+        nonlocal create_new_config
+        if val not in config:
+            if not create_new_config:
+                create_new_config = True
+                print(f'creating new config {config_path}')
+            if not val:
+                print(comment)
+                val = input()
+            config[key] = val
+
+    check_val(
+        key = 'token',
+        comment = 'please open https://t.me/BotFather, create bot and copy bot token',
+    )
+
+    if create_new_config:
+        print(
+            f'Created new config, please check it: {config_path}',
+            style='bright_green',
+        )
+        dump_config()
+        load_config()
+
+
+make_config()
+
 tg = pyrogram.Client(
     bot_token = config['bot_token']
 )
