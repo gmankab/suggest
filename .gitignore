@@ -1,0 +1,13 @@
+/__pycache__
+/libs
+/latest_release/libs
+*.session
+config*
+downloads
+config.py
+libs.zip
+test.py
+python*
+cache
+data
+start.bat
