@@ -1,5 +1,5 @@
 '''
-A bot that allows you to suggest posts in telegram channels, as in VK publics
+I am a bot who allows you to suggest posts in telegram channels, as in VK publics
 python 3.10.4
 '''
 
@@ -8,6 +8,7 @@ from urllib import request as r
 from inspect import cleandoc as cd
 import subprocess
 import traceback
+import asyncio
 import pathlib
 import shutil
 import sys
@@ -114,15 +115,18 @@ def install_libs():
 
         os.system(f'{pip} config set global.no-warn-script-location true')
         os.system(f'{pip} install -U pip {" ".join(requirements)} -t {libs}')
+        clear_dir(downloads)
         print('installed, restarting...')
         os.system(f'{sys.executable} {pathlib.Path(__file__)}')
         sys.exit()
+    print('done')
 
 
 install_libs()
 
 
 import pyrogram
+from pyrogram import filters
 import ruamel.yaml
 
 # this lib needed for beautiful output:
@@ -152,10 +156,18 @@ load_config()
 
 def dump_config():
     open(config_path, 'w').write(
-f'''
+f'''\
 # please open https://t.me/BotFather, create bot and copy bot token
 token: {config['token']}
 
+# please open https://my.telegram.org/apps and copy api_id and api_hash.
+# WARNING: use ony your own api_id and api_hash. I already tried to take them from decompiled official telegram app, and 20 minutes later my telegram account get banned. Then I wrote email with explanation on recover@telegram.org and on the next day they unbanned me. So please use only your own api_id and api_hash
+api_id: {config['api_id']}
+api_hash: {config['api_hash']}
+
+# You can find ID of any chat in your browser's address bar at https://web.telegram.org/z/. It must be number without letters.
+# WARNING: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn't "-" sign then you don't need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account's "saved messages", input "me". Or you can use @name, of any user, chanel or chat.
+channel_id: {config['channel_id']}
 '''
     )
 
@@ -169,24 +181,48 @@ def make_config():
         val: any = None,
     ):
         nonlocal create_new_config
-        if val not in config:
+        if key not in config:
             if not create_new_config:
                 create_new_config = True
                 print(f'creating new config {config_path}')
             if not val:
-                print(comment)
+                print(
+                    comment,
+                    end=''
+                )
                 val = input()
             config[key] = val
 
     check_val(
         key = 'token',
-        comment = 'please open https://t.me/BotFather, create bot and copy bot token',
+        comment = 'please open https://t.me/BotFather, create bot and copy bot token, then paste token here >> ',
+    )
+
+    if (
+        'api_id' not in config
+    ) or (
+        'api_hash' not in config
+    ):
+        print('\nplease open https://my.telegram.org/apps and copy api_id and api_hash.\n[bold red]warning[/bold red]: use ony your own api_id and api_hash. I already tried to take them from decompiled official telegram app, and 20 minutes later my telegram account get banned. Then I wrote email with explanation on recover@telegram.org and on the next day they unbanned me. So please use only your own api_id and api_hash\bWhy is the api key needed for bots? Answer - https://docs.pyrogram.org/faq/why-is-the-api-key-needed-for-bots')
+
+    check_val(
+        key = 'api_id',
+        comment = 'input api_id >> ',
+    )
+
+    check_val(
+        key = 'api_hash',
+        comment = 'input api_hash >> ',
+    )
+
+    check_val(
+        key = 'channel_id',
+        comment = '\nYou can find ID of any chat in your browser\'s address bar at https://web.telegram.org/z/. It must be number without letters.\n[bold red]warning[/bold red]: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn\'t "-" sign then you don\'t need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account\'s "saved messages", input "me". Or you can use @name, of any user, chanel or chat.\n\ninput id of the chat in which suggestions that you confirm will be published >>'
     )
 
     if create_new_config:
         print(
-            f'Created new config, please check it: {config_path}',
-            style='bright_green',
+            f'[bright_green]Created new config[/bright_green], please check it: {config_path}',
         )
         dump_config()
         load_config()
@@ -194,6 +230,33 @@ def make_config():
 
 make_config()
 
+
 tg = pyrogram.Client(
-    bot_token = config['bot_token']
+    session_name = 'suggest',
+    bot_token = config['token'],
+    api_id = config['api_id'],
+    api_hash = config['api_hash']
 )
+
+
+@tg.on_message(filters.command(['help', 'start']))
+async def start_command(app, msg):
+    await msg.reply(
+        'Hello! Send me any message to suggest it to @example_gmanka_channel'
+    )
+
+
+@tg.on_message()
+async def echo(app, msg):
+    for admin in await app.get_chat_members(
+        chat_id = config['channel_id'],
+        filter="administrators"
+    ):
+        if not admin.user.is_bot:
+            print(admin.user.id)
+            await msg.forward(admin.user.id)
+
+
+print('bot started')
+
+tg.run()
