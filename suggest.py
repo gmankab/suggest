@@ -127,6 +127,7 @@ install_libs()
 
 import pyrogram
 from pyrogram import filters
+from pyrogram.errors import PeerIdInvalid
 import ruamel.yaml
 
 # this lib needed for beautiful output:
@@ -162,12 +163,18 @@ token: {config['token']}
 
 # please open https://my.telegram.org/apps and copy api_id and api_hash.
 # WARNING: use ony your own api_id and api_hash. I already tried to take them from decompiled official telegram app, and 20 minutes later my telegram account get banned. Then I wrote email with explanation on recover@telegram.org and on the next day they unbanned me. So please use only your own api_id and api_hash
+# Why is the api key needed for bots? Answer - https://docs.pyrogram.org/faq/why-is-the-api-key-needed-for-bots
 api_id: {config['api_id']}
 api_hash: {config['api_hash']}
 
 # You can find ID of any chat in your browser's address bar at https://web.telegram.org/z/. It must be number without letters.
-# WARNING: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn't "-" sign then you don't need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account's "saved messages", input "me". Or you can use @name, of any user, chanel or chat.
-channel_id: {config['channel_id']}
+# WARNING: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn't "-" sign then you don't need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account's "saved messages", input "me". Or you can use @name, of any user, chanel or chat
+
+# id of the chanel in which suggestions that you confirm will be published
+main_channel_id: {config['channel_id']}
+
+# id of chanel for bot logs
+logs_chat_id: {config['logs_chat_id']}
 '''
     )
 
@@ -203,7 +210,7 @@ def make_config():
     ) or (
         'api_hash' not in config
     ):
-        print('\nplease open https://my.telegram.org/apps and copy api_id and api_hash.\n[bold red]warning[/bold red]: use ony your own api_id and api_hash. I already tried to take them from decompiled official telegram app, and 20 minutes later my telegram account get banned. Then I wrote email with explanation on recover@telegram.org and on the next day they unbanned me. So please use only your own api_id and api_hash\bWhy is the api key needed for bots? Answer - https://docs.pyrogram.org/faq/why-is-the-api-key-needed-for-bots')
+        print('\nplease open https://my.telegram.org/apps and copy api_id and api_hash.\n[bold red]warning[/bold red]: use ony your own api_id and api_hash. I already tried to take them from decompiled official telegram app, and 20 minutes later my telegram account get banned. Then I wrote email with explanation on recover@telegram.org and on the next day they unbanned me. So please use only your own api_id and api_hash\nWhy is the api key needed for bots? Answer - https://docs.pyrogram.org/faq/why-is-the-api-key-needed-for-bots')
 
     check_val(
         key = 'api_id',
@@ -215,12 +222,24 @@ def make_config():
         comment = 'input api_hash >> ',
     )
 
+    if (
+        'main_channel_id' not in config
+    ) or (
+        'logs_channel_id' not in config
+    ):
+        print('\nYou can find ID of any chat in your browser\'s address bar at https://web.telegram.org/z/. It must be number without letters.\n[bold red]warning[/bold red]: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn\'t "-" sign then you don\'t need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account\'s "saved messages", input "me". Or you can use @name, of any user, chanel or chat.\n')
+
     check_val(
-        key = 'channel_id',
-        comment = '\nYou can find ID of any chat in your browser\'s address bar at https://web.telegram.org/z/. It must be number without letters.\n[bold red]warning[/bold red]: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn\'t "-" sign then you don\'t need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account\'s "saved messages", input "me". Or you can use @name, of any user, chanel or chat.\n\ninput id of the chat in which suggestions that you confirm will be published >>'
+        key = 'main_channel_id',
+        comment = 'input id of the chanel in which suggestions that you confirm will be published >>'
     )
 
-    if create_new_config:
+    check_val(
+        key = 'logs_channel_id',
+        val = None,
+    )
+
+    if create_new_config:3s
         print(
             f'[bright_green]Created new config[/bright_green], please check it: {config_path}',
         )
@@ -239,6 +258,14 @@ tg = pyrogram.Client(
 )
 
 
+def get_username(user):
+    if user.username:
+        return user.username
+    else:
+        return user.id
+
+
+
 @tg.on_message(filters.command(['help', 'start']))
 async def start_command(app, msg):
     await msg.reply(
@@ -247,14 +274,26 @@ async def start_command(app, msg):
 
 
 @tg.on_message()
-async def echo(app, msg):
+async def to_admin(app, msg):
+    admins =[]
     for admin in await app.get_chat_members(
         chat_id = config['channel_id'],
         filter="administrators"
     ):
         if not admin.user.is_bot:
-            print(admin.user.id)
-            await msg.forward(admin.user.id)
+            admins.append(
+                admin.user
+            )
+    username =get_username(msg.from_user)
+    print(f'forwarding message {msg.message_id} from {username} to admins of channel {config["channel_id"]}')
+    for admin in admins:
+        admin_name = get_username(admin)
+        print(f'[blue]trying forwarding[/blue] to {admin_name}')
+        try:
+            await msg.copy(admin.id)
+            print(f'[light_green]succes forwarding[/light_green] to {admin_name}')
+        except pyrogram.errors.exceptions.bad_request_400.PeerIdInvalid:
+            print(f'[red]failed forwarding[/] to {admin_name}, maybe this user didn\'t started bot')
 
 
 print('bot started')
