@@ -13,9 +13,10 @@ sys.path.append(
 )
 
 from init import config_create
-import pyrogram
+import rich
 
 
+rich.pretty.install()
 config = config_create(
     latest_supported_config,
     script_version,

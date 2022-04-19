@@ -100,25 +100,34 @@ class Buttons:
             ],
         ],
     )
-    publish = pyrogram.types.InlineKeyboardMarkup(
-        [
-            [
-                Button(
-                    text = 'опубликовать',
-                    callback_data = 'publish',
-                ),
-                Button(
-                    text = '↓забанить↓',
-                    callback_data = 'open_ban_menu',
-                )
-            ],
-        ],
+    open_ban_menu = Button(
+        text = '☠️забанить',
+        callback_data = 'open_ban_menu',
     )
+
+    @staticmethod
+    def publish(id):
+        return pyrogram.types.InlineKeyboardMarkup(
+            [
+                [
+                    Buttons.open_ban_menu,
+                    Button(
+                        text = '⛔отклонить',
+                        callback_data = f'cancel {id}',
+                    ),
+                    Button(
+                        text = '✅опубликовать',
+                        callback_data = f'publish {id}',
+                    ),
+                ],
+            ],
+        )
+
     ban_menu = pyrogram.types.InlineKeyboardMarkup(
         [
             [
                 Button(
-                    text = '↑скрыть меню↑',
+                    text = '✅скрыть меню',
                     callback_data = 'close_ban_menu',
                 )
             ], [
@@ -145,6 +154,11 @@ class Buttons:
                 Button(
                     text = 'забанить на 30 секунд',
                     callback_data = 'ban 30_sec',
+                )
+            ], [
+                Button(
+                    text = '✅скрыть меню',
+                    callback_data = 'close_ban_menu',
                 )
             ],
         ],
@@ -206,6 +220,27 @@ def answer_empty(
 
 @bot.on_callback_query(
     callback_filter(
+        'cancel'
+    )
+)
+async def cancel(
+    _,
+    cb,
+):
+    user = cb.message.entities[0].user
+    await cb.message.edit(
+        text = f'⛔\nпредложил {user.mention()}\nотклонил {cb.from_user.mention()}'
+    )
+
+    await bot.send_message(
+        text = '⛔\nтвой пост отклонен',
+        chat_id = user.id,
+        reply_to_message_id = int(cb.data.split(' ', 1)[-1]),
+    )
+
+
+@bot.on_callback_query(
+    callback_filter(
         'publish'
     )
 )
@@ -213,13 +248,66 @@ async def publish(
     _,
     cb,
 ):
+    user = cb.message.entities[0].user
     await cb.message.edit(
-        text = f'✅\nпредложил {cb.message.entities[0].user.mention()}\nопубликовал {cb.from_user.mention()}'
+        text = f'✅\nпредложил {user.mention()}\nопубликовал {cb.from_user.mention()}'
     )
-    await forward(
-        msg = cb.message.reply_to_message,
-        target = config['main_chat'],
+    link = (
+        await forward(
+            msg = cb.message.reply_to_message,
+            target = config['main_chat'],
+        )
+    ).link.replace(
+        'https://',
+        ''
     )
+
+    await bot.send_message(
+        text = f'✅\nтвой пост опубликован - {link}',
+        chat_id = user.id,
+        reply_to_message_id = int(cb.data.split(' ', 1)[-1]),
+    )
+
+
+@bot.on_callback_query(
+    callback_filter(
+        'open_ban_menu'
+    )
+)
+async def open_ban_menu(
+    _,
+    cb,
+):
+    await cb.answer()
+    user = cb.message.entities[0].user
+    await cb.message.reply(
+        text = f'{cb.from_user.mention()} открыл меню для бана {user.mention()}',
+        reply_markup = Buttons.ban_menu
+    )
+
+
+@bot.on_callback_query(
+    callback_filter(
+        'ban '  # do not remove whitespace after "ban"
+    )
+)
+async def ban(
+    _,
+    cb,
+):
+    pass
+
+
+@bot.on_callback_query(
+    callback_filter(
+        'close_ban_menu'
+    )
+)
+async def close_ban_menu(
+    _,
+    cb,
+):
+    await cb.message.delete()
 
 
 @bot.on_callback_query(
@@ -232,9 +320,10 @@ async def suggest(
     cb,
 ):
     await cb.message.edit(
-        text = '✅\nПост отправлен\nЯ пришлю тебе уведомление, когда его опубликуют, или отклонят'
+        text = '⌛\nПост отправлен\nЯ пришлю тебе уведомление, когда его опубликуют, или отклонят'
     )
-
+    id = cb.message.reply_to_message.message_id
+    log(Buttons.publish(id))
     await (
         await forward(
         msg = cb.message.reply_to_message,
@@ -243,7 +332,7 @@ async def suggest(
     ).reply(
         text = f'предложил {cb.from_user.mention()}',
         quote = True,
-        reply_markup = Buttons.publish,
+        reply_markup = Buttons.publish(id)
 )
 
 
