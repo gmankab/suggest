@@ -34,11 +34,13 @@ def clear_dir(dir):
     mkdir(dir)
 
 
-def get_username(user):
+def get_username(
+    user
+) -> str:
     if user.username:
-        return user.username
+        return f'@{user.username}'
     else:
-        return user.id
+        return str(user.id)
 
 
 def auto_rename(file):

@@ -13,6 +13,7 @@ sys.path.append(
 )
 
 from init import config_create
+import pyrogram
 
 
 config = config_create(
@@ -22,3 +23,12 @@ config = config_create(
 
 
 import bot
+
+
+def main():
+    print(f'started bot v{script_version}')
+    bot.bot.start()
+    pyrogram.idle()
+
+
+main()

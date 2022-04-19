@@ -10,56 +10,6 @@ import sys
 import os
 
 
-def install_libs():
-    print('installing libs')
-    requirements = [
-        'rich',
-        'psutil',
-        'pyrogram',
-        'tgcrypto',
-        'ruamel.yaml',
-    ]
-
-    pip = f'{sys.executable} -m pip'
-    pip_chache = f'{downloads}/pip_chache'
-    output = subprocess.getstatusoutput(
-        f'{pip} install --upgrade pip'
-    )[1]
-    print(output)
-    if 'No module named pip' in output:
-        print('installing pip...')
-        # pip is a shit which allow to install libs, so if we want to install libs we must have pip
-        py_dir = f.get_parrent_dir(sys.executable)
-
-        # fixing shit which doesn't allow to install pip in python embedable in windows:
-        for file in os.listdir(
-            py_dir
-        ):
-            if file[-5:] == '._pth':
-                with open(
-                    f'{py_dir}/{file}', 'r+'
-                ) as file:
-                    if '#import site' in file.readlines()[-1]:
-                        file.write('import site')
-
-        # instaling pip:
-        get_pip = f'{downloads}/get-pip.py'
-        f.mkdir(downloads)
-
-        r.urlretrieve(
-            url = 'https://bootstrap.pypa.io/get-pip.py',
-            filename = get_pip,
-        )
-        os.system(f'{sys.executable} {get_pip} --no-warn-script-location')
-        os.remove(get_pip)
-
-    if Path(libs_dir).exists():
-        print(f'deleting {libs_dir}')
-        f.rmtree(libs_dir)
-    os.system(f'{pip} config set global.no-warn-script-location true')
-    os.system(f'{pip} install -U {" ".join(requirements)} -t {libs_dir} --cache-dir {pip_chache}')
-
-
 def config_create(
     latest_supported_config = None,
     script_version = None,
@@ -154,6 +104,56 @@ version: {script_version}  # # # WARNING: DON'T TOUCH VERSION
     return config
 
 
+def install_libs():
+    print('installing libs')
+    requirements = [
+        'rich',
+        'psutil',
+        'pyrogram',
+        'tgcrypto',
+        'ruamel.yaml',
+    ]
+
+    pip = f'{sys.executable} -m pip'
+    pip_chache = f'{downloads}/pip_chache'
+    output = subprocess.getstatusoutput(
+        f'{pip} install --upgrade pip'
+    )[1]
+    print(output)
+    if 'No module named pip' in output:
+        print('installing pip...')
+        # pip is a shit which allow to install libs, so if we want to install libs we must have pip
+        py_dir = f.get_parrent_dir(sys.executable)
+
+        # fixing shit which doesn't allow to install pip in python embedable in windows:
+        for file in os.listdir(
+            py_dir
+        ):
+            if file[-5:] == '._pth':
+                with open(
+                    f'{py_dir}/{file}', 'r+'
+                ) as file:
+                    if '#import site' in file.readlines()[-1]:
+                        file.write('import site')
+
+        # instaling pip:
+        get_pip = f'{downloads}/get-pip.py'
+        f.mkdir(downloads)
+
+        r.urlretrieve(
+            url = 'https://bootstrap.pypa.io/get-pip.py',
+            filename = get_pip,
+        )
+        os.system(f'{sys.executable} {get_pip} --no-warn-script-location')
+        os.remove(get_pip)
+
+    if Path(libs_dir).exists():
+        print(f'deleting {libs_dir}')
+        f.rmtree(libs_dir)
+    os.system(f'{pip} config set global.no-warn-script-location true')
+    os.system(f'{pip} install -U {" ".join(requirements)} -t {libs_dir} --cache-dir {pip_chache}')
+
+
 def config_load(
     data = None
 ):
@@ -223,4 +223,3 @@ yml = ruamel.yaml.YAML()
 console = rich.console.Console(
     record = True
 )
-
