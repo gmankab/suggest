@@ -25,10 +25,5 @@ config = config_create(
 import bot
 
 
-def main():
-    print(f'started bot v{script_version}')
-    bot.bot.start()
-    pyrogram.idle()
-
-
-main()
+print(f'started bot v{script_version}')
+bot.main()

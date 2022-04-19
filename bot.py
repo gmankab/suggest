@@ -20,23 +20,61 @@ bot = pyrogram.Client(
     workdir = cwd,
 )
 
+
+blacklist = []
+
+
 console = rich.console.Console()
 log = console.log
 
 
-def callback_filter(callback):
+def callback_filter(*got_callback):
     async def func(
         __,
         _,
-        query
+        target_callback
     ):
-        return callback == query.data
+        for i in got_callback:
+            if i in target_callback.data:
+                return True
+        # return target_callback.data in got_callback
+        return False
 
-    # "data" kwarg is accessed with "flt.data" above
     return filters.create(
         func = func,
-        data = callback,
+        data = got_callback,
     )
+
+
+async def forward(
+    msg,
+    target,
+):
+    if msg.media_group_id:
+        now = datetime.datetime.now()
+        deadline = now - datetime.timedelta(
+            seconds = 3
+        )
+        if cache:
+            for item in cache:
+                cached_id, time = item
+                if cached_id == msg.media_group_id:
+                    return
+                if time < deadline:
+                    cache.remove(item)
+        cache.append((msg.media_group_id, now))
+        return (
+            await bot.copy_media_group(
+                chat_id = target,
+                from_chat_id = msg.chat.id,
+                message_id = msg.message_id,
+                captions = msg.caption,
+            )
+        )[0]
+    else:
+        return await msg.copy(
+            target,
+        )
 
 
 @dataclass
@@ -56,20 +94,58 @@ class Buttons:
         [
             [
                 Button(
-                    text = 'проверил, предложить пост',
+                    text = 'проверил, отправить',
                     callback_data = 'suggest',
                 ),
             ],
         ],
     )
-
-    suggested = pyrogram.types.InlineKeyboardMarkup(
+    publish = pyrogram.types.InlineKeyboardMarkup(
         [
             [
                 Button(
-                    text = 'пост предложен✅',
-                    callback_data = 'empty',
+                    text = 'опубликовать',
+                    callback_data = 'publish',
                 ),
+                Button(
+                    text = '↓забанить↓',
+                    callback_data = 'open_ban_menu',
+                )
+            ],
+        ],
+    )
+    ban_menu = pyrogram.types.InlineKeyboardMarkup(
+        [
+            [
+                Button(
+                    text = '↑скрыть меню↑',
+                    callback_data = 'close_ban_menu',
+                )
+            ], [
+                Button(
+                    text = 'забанить навсегда',
+                    callback_data = 'ban ever',
+                )
+            ], [
+                Button(
+                    text = 'забанить на год',
+                    callback_data = 'ban year',
+                )
+            ], [
+                Button(
+                    text = 'забанить на месяц',
+                    callback_data = 'ban month',
+                )
+            ], [
+                Button(
+                    text = 'забанить на неделю',
+                    callback_data = 'ban week',
+                )
+            ], [
+                Button(
+                    text = 'забанить на 30 секунд',
+                    callback_data = 'ban 30_sec',
+                )
             ],
         ],
     )
@@ -95,49 +171,25 @@ async def start_command(
 
 
 @bot.on_message()
-async def forward_to_confirm_channel(
+async def on_message(
     app,
     msg
 ):
-    if msg.media_group_id:
-        now = datetime.datetime.now()
-        deadline = now - datetime.timedelta(
-            seconds = 3
-        )
-        if cache:
-            for item in cache:
-                cached_id, time = item
-                if cached_id == msg.media_group_id:
-                    return
-                if time < deadline:
-                    cache.remove(item)
-        cache.append((msg.media_group_id, now))
-
     chat = msg.chat.id
-
+    if chat in blacklist:
+        return
     log(f'forwarding message {msg} from {f.get_username(msg.from_user)} to confirming_chat {config["confirming_chat"]}')
 
-    if msg.media_group_id:
-        suggestion = (
-            await bot.copy_media_group(
-                chat_id = chat,
-                from_chat_id = chat,
-                message_id = msg.message_id,
-                captions = msg.caption,
-            )
-        )[0]
-    else:
-        suggestion = await msg.copy(
+    await (
+        await forward(
+            msg,
             chat,
         )
-
-    await suggestion.reply(
+    ).reply(
         text = 'Проверь этот пост, потому что его нельзя будет отредактировать или удалить',
         quote = True,
         reply_markup = Buttons.suggest
     )
-
-    # text = f'Пост предложен пользователем {msg.from_user.mention()}',
 
 
 @bot.on_callback_query(
@@ -154,13 +206,56 @@ def answer_empty(
 
 @bot.on_callback_query(
     callback_filter(
-        'suggest'
+        'publish'
     )
 )
-def suggest(
+async def publish(
     _,
     cb,
 ):
-    cb.message.edit_reply_markup(
-        Buttons.suggested
+    await cb.message.edit(
+        text = f'✅\nпредложил {cb.message.entities[0].user.mention()}\nопубликовал {cb.from_user.mention()}'
     )
+    await forward(
+        msg = cb.message.reply_to_message,
+        target = config['main_chat'],
+    )
+
+
+@bot.on_callback_query(
+    callback_filter(
+        'suggest'
+    )
+)
+async def suggest(
+    _,
+    cb,
+):
+    await cb.message.edit(
+        text = '✅\nПост отправлен\nЯ пришлю тебе уведомление, когда его опубликуют, или отклонят'
+    )
+
+    await (
+        await forward(
+        msg = cb.message.reply_to_message,
+        target = config['confirming_chat'],
+        )
+    ).reply(
+        text = f'предложил {cb.from_user.mention()}',
+        quote = True,
+        reply_markup = Buttons.publish,
+)
+
+
+def main():
+    global blacklist
+    bot.start()
+    blacklist = list(
+        bot.get_chat(
+            id
+        ).id for id in (
+            config['confirming_chat'],
+            config['main_chat']
+        )
+    )
+    pyrogram.idle()
