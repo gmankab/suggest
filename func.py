@@ -21,6 +21,18 @@ def get_parrent_dir(file):
     )
 
 
+cwd = f'{get_parrent_dir(__file__)}/data'
+ban_list_path = f'{cwd}/ban_list'
+libs_dir = f'{cwd}/libs'
+
+sys.path.append(
+    libs_dir
+)
+
+import ruamel.yaml
+yml = ruamel.yaml.YAML()
+
+
 def mkdir(dir):
     if not os.path.isdir(dir):
         os.mkdir(dir)
@@ -56,7 +68,7 @@ def auto_rename(file):
 
 
 def restart(*args):
-    command = f'{sys.executable} {Path(__file__)} {" ".join(args)}'
+    command = f'{sys.executable} {sys.argv[0]} {" ".join(args)}'
     globals().clear()
     import os as new_os
     import sys as new_sys
@@ -91,3 +103,22 @@ def rmtree(dir):
         raise PermissionError(
             f'Can\'t remove dir "{dir}", no permissions. Try to remove it yourself'
         ) from error
+
+
+def load_ban_list():
+    if Path(ban_list_path).exists() and os.stat(ban_list_path).st_size != 0:
+        return yml.load(open(ban_list_path, 'r'))
+    else:
+        return []
+
+
+def dump_ban_list(
+    data
+):
+    yml.dump(
+        data,
+        open(
+            ban_list_path,
+            'w',
+        ),
+    )

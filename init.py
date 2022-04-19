@@ -112,6 +112,7 @@ def install_libs():
         'pyrogram',
         'tgcrypto',
         'ruamel.yaml',
+        'python-dateutil',
     ]
 
     pip = f'{sys.executable} -m pip'
@@ -149,7 +150,7 @@ def install_libs():
 
     if Path(libs_dir).exists():
         print(f'deleting {libs_dir}')
-        f.rmtree(libs_dir)
+        # f.rmtree(libs_dir)
     os.system(f'{pip} config set global.no-warn-script-location true')
     os.system(f'{pip} install -U {" ".join(requirements)} -t {libs_dir} --cache-dir {pip_chache}')
 
@@ -185,13 +186,14 @@ def config_dump(
     )
 
 
-config = {}
 cwd = f'{f.get_parrent_dir(__file__)}/data'
 config_path = f'{cwd}/config.yml'
 downloads = f'{cwd}/downloads'
 libs_dir = f'{cwd}/libs'
 
 f.mkdir(cwd)
+config = {}
+
 
 # adding libs and files from Current Work Dir to sys.path
 # this is needed so that python can find this libs and files, then use them
@@ -202,6 +204,7 @@ sys.path += (
 
 
 try:
+    from dateutil.relativedelta import relativedelta
     import ruamel.yaml
     import pyrogram
     import psutil

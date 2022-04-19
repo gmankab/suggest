@@ -1,4 +1,5 @@
 from init import config_create, cwd
+from dateutil.relativedelta import relativedelta
 from dataclasses import dataclass
 import pyrogram
 import func as f
@@ -7,6 +8,7 @@ import rich
 
 
 Button = pyrogram.types.InlineKeyboardButton
+InlKb = pyrogram.types.InlineKeyboardMarkup
 filters = pyrogram.filters
 config = config_create()
 cache = []
@@ -21,7 +23,8 @@ bot = pyrogram.Client(
 )
 
 
-blacklist = []
+chats_blacklist = []
+ban_list = f.load_ban_list()
 
 
 console = rich.console.Console()
@@ -51,7 +54,9 @@ async def forward(
     target,
 ):
     if msg.media_group_id:
-        now = datetime.datetime.now()
+        now = datetime.datetime.now().replace(
+        microsecond = 0
+    )
         deadline = now - datetime.timedelta(
             seconds = 3
         )
@@ -90,24 +95,24 @@ class Bot:
 
 @dataclass
 class Buttons:
-    suggest = pyrogram.types.InlineKeyboardMarkup(
+    suggest = InlKb(
         [
             [
                 Button(
-                    text = 'проверил, отправить',
+                    text = '✅проверил, отправить',
                     callback_data = 'suggest',
                 ),
             ],
         ],
     )
-    open_ban_menu = Button(
-        text = '☠️забанить',
-        callback_data = 'open_ban_menu',
+    unban = Button(
+        text = '❤️разбанить',
+        callback_data = 'unban',
     )
 
     @staticmethod
     def publish(id):
-        return pyrogram.types.InlineKeyboardMarkup(
+        return InlKb(
             [
                 [
                     Buttons.open_ban_menu,
@@ -123,7 +128,7 @@ class Buttons:
             ],
         )
 
-    ban_menu = pyrogram.types.InlineKeyboardMarkup(
+    ban_menu = InlKb(
         [
             [
                 Button(
@@ -152,8 +157,8 @@ class Buttons:
                 )
             ], [
                 Button(
-                    text = 'забанить на 30 секунд',
-                    callback_data = 'ban 30_sec',
+                    text = 'забанить на 2 минуты',
+                    callback_data = 'ban 2_min',
                 )
             ], [
                 Button(
@@ -190,7 +195,7 @@ async def on_message(
     msg
 ):
     chat = msg.chat.id
-    if chat in blacklist:
+    if chat in chats_blacklist:
         return
     log(f'forwarding message {msg} from {f.get_username(msg.from_user)} to confirming_chat {config["confirming_chat"]}')
 
@@ -295,7 +300,54 @@ async def ban(
     _,
     cb,
 ):
-    pass
+    user = cb.message.entities[-1].user
+    answer = f'{cb.from_user.mention()} забанил {user.mention} '
+    ban_time = cb.data.split(' ', 1)[-1]
+    unban = None
+    now = datetime.datetime.now().replace(
+        microsecond = 0,
+    )
+
+    match ban_time:
+        case 'ever':
+            answer += 'навсегда'
+        case 'year':
+            answer += 'на год'
+            unban = now + relativedelta(
+                years = 1
+            )
+        case 'month':
+            answer += 'на месяц'
+            unban = now + relativedelta(
+                months = 1
+            )
+        case 'week':
+            answer += 'на неделю'
+            unban = now + relativedelta(
+                weeks = 1
+            )
+        case '2_min':
+            answer += 'на 2 минуты'
+            unban = now + relativedelta(
+                minutes = 2
+            )
+    if unban:
+        unban = unban.isoformat(' ', 'minutes')
+    else:
+        unban = 'forever'
+    for banned_user in ban_list:
+        if user.id == banned_user['id']:
+            return
+    await cb.message.edit(
+        text = answer,
+        reply_markup = InlKb([[Buttons.unban]]),
+    )
+    new_rep_m = InlKb([[Buttons.unban] + cb.message.reply_to_message.reply_markup.inline_keyboard[0][1:]])
+    log(new_rep_m)
+    log(cb.message.reply_to_message.reply_markup)
+    await cb.message.reply_to_message.edit_reply_markup(
+        new_rep_m
+    )
 
 
 @bot.on_callback_query(
@@ -337,9 +389,9 @@ async def suggest(
 
 
 def main():
-    global blacklist
+    global chats_blacklist
     bot.start()
-    blacklist = list(
+    chats_blacklist = list(
         bot.get_chat(
             id
         ).id for id in (
