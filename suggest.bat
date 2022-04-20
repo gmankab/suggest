@@ -12,7 +12,7 @@ set python_zip=%python_dir%\python.zip
 set project_tmp=%cwd%\%project_name%.tmp
 set project_py=%cwd%\%project_name%.py
 set python_link=https://www.python.org/ftp/python/3.10.4/python-3.10.4-embed-amd64.zip
-set project_link=https://raw.githubusercontent.com/gmankab/wildberries/main/latest_release/wildberries.py
+set project_link=https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/suggest.py
 
 
 if not exist "%python_dir%" (
