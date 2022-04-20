@@ -1,17 +1,22 @@
 from init import config_create, cwd
 from dateutil.relativedelta import relativedelta
 from dataclasses import dataclass
+import ruamel.yaml
 import pyrogram
 import func as f
 import datetime
 import rich
 
 
+yml = ruamel.yaml.YAML()
 Button = pyrogram.types.InlineKeyboardButton
 InlKb = pyrogram.types.InlineKeyboardMarkup
 filters = pyrogram.filters
 config = config_create()
 cache = []
+
+
+ban_list_path = f'{cwd}/ban_list.yml'
 
 
 bot = pyrogram.Client(
@@ -31,6 +36,10 @@ console = rich.console.Console()
 log = console.log
 
 
+def get_first_button(msg):
+    return InlKb([[msg.reply_markup.inline_keyboard[0][0]]])
+
+
 def callback_filter(*got_callback):
     async def func(
         __,
@@ -47,6 +56,49 @@ def callback_filter(*got_callback):
         func = func,
         data = got_callback,
     )
+
+
+async def dump_ban_list(
+    data
+):
+    yml.dump(
+        data,
+        open(
+            ban_list_path,
+            'w',
+        ),
+    )
+    await bot.send_document(
+        chat_id = config['confirming_chat'],
+        document = ban_list_path,
+        caption = 'бан лист обновлен',
+    )
+
+
+async def is_banned(
+    user_id,
+):
+    now = datetime.datetime.now().replace(
+        microsecond = 0,
+    )
+    updated = False
+    for user in ban_list.copy():
+        if user['time'] != 'forever':
+            if datetime.fromisoformat(user['time']) <  now:
+                ban_list.remove(user)
+                updated = True
+                if user['id'] == user_id:
+                    await dump_ban_list(ban_list)
+                    return False
+        if updated:
+            await dump_ban_list(ban_list)
+        if user['id'] == user_id:
+            if user['time'] != 'forever':
+                return 'forever'
+            return datetime.fromisoformat(user['time']) - now
+    if updated:
+        await dump_ban_list(ban_list)
+    return False
 
 
 async def forward(
@@ -105,24 +157,31 @@ class Buttons:
             ],
         ],
     )
+    open_ban_menu = Button(
+        text = '💀забанить',
+        callback_data = 'open_ban_menu',
+    )
     unban = Button(
         text = '❤️разбанить',
         callback_data = 'unban',
     )
 
     @staticmethod
-    def publish(id):
+    def publish(
+        notify,
+        ban_button,
+    ):
         return InlKb(
             [
                 [
-                    Buttons.open_ban_menu,
+                    ban_button,
                     Button(
                         text = '⛔отклонить',
-                        callback_data = f'cancel {id}',
+                        callback_data = f'cancel {notify}',
                     ),
                     Button(
                         text = '✅опубликовать',
-                        callback_data = f'publish {id}',
+                        callback_data = f'publish {notify}',
                     ),
                 ],
             ],
@@ -138,7 +197,7 @@ class Buttons:
             ], [
                 Button(
                     text = 'забанить навсегда',
-                    callback_data = 'ban ever',
+                    callback_data = 'ban forever',
                 )
             ], [
                 Button(
@@ -197,7 +256,7 @@ async def on_message(
     chat = msg.chat.id
     if chat in chats_blacklist:
         return
-    log(f'forwarding message {msg} from {f.get_username(msg.from_user)} to confirming_chat {config["confirming_chat"]}')
+    # log(f'forwarding message {msg} from {f.get_username(msg.from_user)} to confirming_chat {config["confirming_chat"]}')
 
     await (
         await forward(
@@ -232,15 +291,16 @@ async def cancel(
     _,
     cb,
 ):
-    user = cb.message.entities[0].user
     await cb.message.edit(
-        text = f'⛔\nпредложил {user.mention()}\nотклонил {cb.from_user.mention()}'
+        text = f'{f.get_text(cb.message)}\n⛔Админ {cb.from_user.mention()} отклонил пост, юзер получил уведомление.',
+        reply_markup = get_first_button(cb.message),
     )
 
+    chat, msg = cb.data.split(' ', 1)[-1].split('/', 1)
     await bot.send_message(
-        text = '⛔\nтвой пост отклонен',
-        chat_id = user.id,
-        reply_to_message_id = int(cb.data.split(' ', 1)[-1]),
+        text = '⛔Твой пост отклонен',
+        chat_id = int(chat),
+        reply_to_message_id = int(msg),
     )
 
 
@@ -253,9 +313,10 @@ async def publish(
     _,
     cb,
 ):
-    user = cb.message.entities[0].user
+    log(get_first_button(cb.message))
     await cb.message.edit(
-        text = f'✅\nпредложил {user.mention()}\nопубликовал {cb.from_user.mention()}'
+        text = f'{f.get_text(cb.message)}\n✅Админ {cb.from_user.mention()} опубликовал пост, юзер получил уведомление.',
+        reply_markup = get_first_button(cb.message),
     )
     link = (
         await forward(
@@ -266,11 +327,11 @@ async def publish(
         'https://',
         ''
     )
-
+    chat, msg = cb.data.split(' ', 1)[-1].split('/', 1)
     await bot.send_message(
-        text = f'✅\nтвой пост опубликован - {link}',
-        chat_id = user.id,
-        reply_to_message_id = int(cb.data.split(' ', 1)[-1]),
+        text = f'✅Твой пост опубликован - {link}',
+        chat_id = int(chat),
+        reply_to_message_id = int(msg),
     )
 
 
@@ -286,9 +347,46 @@ async def open_ban_menu(
     await cb.answer()
     user = cb.message.entities[0].user
     await cb.message.reply(
-        text = f'{cb.from_user.mention()} открыл меню для бана {user.mention()}',
+        text = f'Админ {cb.from_user.mention()} открыл меню для бана.',
         reply_markup = Buttons.ban_menu
     )
+
+
+@bot.on_callback_query(
+    callback_filter(
+        'unban'
+    )
+)
+async def unban(
+    _,
+    cb,
+):
+    if len(cb.message.reply_markup.inline_keyboard[0]) == 1:
+        reply_markup = InlKb([[Buttons.open_ban_menu]])
+    else:
+        reply_markup = Buttons.publish(
+            notify = f.get_notify(cb.message.reply_to_message),
+            ban_button = Buttons.open_ban_menu,
+        )
+    await cb.message.edit(
+        text = f'{f.get_text(cb.message)}\n❤️Админ {cb.from_user.mention()} разбанил юзера, юзер получил уведомление.',
+        reply_markup = reply_markup
+    )
+    user = f.get_user(cb.message)
+    await bot.send_message(
+        text = '❤️Хорошие новости, ты разбанен',
+        chat_id = user.id,
+    )
+    now = datetime.datetime.now().replace(
+        microsecond = 0,
+    )
+    for item in ban_list.copy():
+        if item['user'] == user.id:
+            ban_list.remove(item)
+        elif item['time'] != 'forever':
+            if datetime.fromisoformat(item['time']) <  now:
+                ban_list.remove(item)
+    await dump_ban_list(ban_list)
 
 
 @bot.on_callback_query(
@@ -300,54 +398,68 @@ async def ban(
     _,
     cb,
 ):
-    user = cb.message.entities[-1].user
-    answer = f'{cb.from_user.mention()} забанил {user.mention} '
+    await cb.message.delete()
     ban_time = cb.data.split(' ', 1)[-1]
-    unban = None
+    time = None
     now = datetime.datetime.now().replace(
         microsecond = 0,
     )
-
     match ban_time:
-        case 'ever':
-            answer += 'навсегда'
+        case 'forever':
+            str_time = 'навсегда'
         case 'year':
-            answer += 'на год'
-            unban = now + relativedelta(
+            str_time = 'на год'
+            time = now + relativedelta(
                 years = 1
             )
         case 'month':
-            answer += 'на месяц'
-            unban = now + relativedelta(
+            str_time = 'на месяц'
+            time = now + relativedelta(
                 months = 1
             )
         case 'week':
-            answer += 'на неделю'
-            unban = now + relativedelta(
+            str_time = 'на неделю'
+            time = now + relativedelta(
                 weeks = 1
             )
         case '2_min':
-            answer += 'на 2 минуты'
-            unban = now + relativedelta(
+            str_time = 'на 2 минуты'
+            time = now + relativedelta(
                 minutes = 2
             )
-    if unban:
-        unban = unban.isoformat(' ', 'minutes')
+    if len(cb.message.reply_to_message.reply_markup.inline_keyboard[0]) == 1:
+        reply_markup = InlKb([[Buttons.unban]])
     else:
-        unban = 'forever'
-    for banned_user in ban_list:
-        if user.id == banned_user['id']:
+        reply_markup = Buttons.publish(
+            notify = f.get_notify(cb.message.reply_to_message),
+            ban_button = Buttons.unban,
+        )
+    await cb.message.reply_to_message.edit(
+        text = f'{f.get_text(cb.message.reply_to_message)}\n💀Админ {cb.from_user.mention()} выдал юзеру бан {str_time}, юзер получил уведомление.',
+        reply_markup = reply_markup,
+    )
+    if time:
+        time = time.isoformat(' ', 'minutes')
+    else:
+        time = 'forever'
+    user = f.get_user(cb.message.reply_to_message)
+    await bot.send_message(
+        text = f'💀К сожалению, ты забанен {str_time}',
+        chat_id = user.id,
+    )
+    for i in ban_list:
+        if i['user'] == user.id:
+            i['time'] = time
+            log(time)
+            await dump_ban_list(ban_list)
             return
-    await cb.message.edit(
-        text = answer,
-        reply_markup = InlKb([[Buttons.unban]]),
+    ban_list.append(
+        {
+            'user': user.id,
+            'time': time,
+        }
     )
-    new_rep_m = InlKb([[Buttons.unban] + cb.message.reply_to_message.reply_markup.inline_keyboard[0][1:]])
-    log(new_rep_m)
-    log(cb.message.reply_to_message.reply_markup)
-    await cb.message.reply_to_message.edit_reply_markup(
-        new_rep_m
-    )
+    await dump_ban_list(ban_list)
 
 
 @bot.on_callback_query(
@@ -371,20 +483,28 @@ async def suggest(
     _,
     cb,
 ):
+    time = is_banned(cb.from_user.id)
+    if time:
+        cb.edit_message_text(
+            text = f'💀К сожалению, ты сейчас забанен. Разбан через {time}'
+        )
+
     await cb.message.edit(
-        text = '⌛\nПост отправлен\nЯ пришлю тебе уведомление, когда его опубликуют, или отклонят'
+        text = '⌛Пост отправлен. Я пришлю тебе уведомление, когда его опубликуют, или отклонят'
     )
-    id = cb.message.reply_to_message.message_id
-    log(Buttons.publish(id))
+    notify = f'{cb.message.chat.id}/{cb.message.reply_to_message.message_id}'
     await (
         await forward(
         msg = cb.message.reply_to_message,
         target = config['confirming_chat'],
         )
     ).reply(
-        text = f'предложил {cb.from_user.mention()}',
+        text = f'⌛️Юзер {cb.from_user.mention()} отправил этот пост в предложку.',
         quote = True,
-        reply_markup = Buttons.publish(id)
+        reply_markup = Buttons.publish(
+            notify = notify,
+            ban_button = Buttons.open_ban_menu,
+        )
 )
 
 

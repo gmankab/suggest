@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime
 import shutil
 import stat
 import sys
@@ -22,7 +23,7 @@ def get_parrent_dir(file):
 
 
 cwd = f'{get_parrent_dir(__file__)}/data'
-ban_list_path = f'{cwd}/ban_list'
+ban_list_path = f'{cwd}/ban_list.yml'
 libs_dir = f'{cwd}/libs'
 
 sys.path.append(
@@ -44,15 +45,6 @@ def clear_dir(dir):
         ignore_errors=True,
     )
     mkdir(dir)
-
-
-def get_username(
-    user
-) -> str:
-    if user.username:
-        return f'@{user.username}'
-    else:
-        return str(user.id)
 
 
 def auto_rename(file):
@@ -112,13 +104,27 @@ def load_ban_list():
         return []
 
 
-def dump_ban_list(
-    data
+def get_text(
+    msg
 ):
-    yml.dump(
-        data,
-        open(
-            ban_list_path,
-            'w',
-        ),
-    )
+    text = ''
+    start = 0
+    if msg.entities:
+        for entity in msg.entities:
+            if entity.type == 'text_mention':
+                text += msg.text[start:entity.offset] + entity.user.mention()
+                start = entity.offset + entity.length
+    return text + msg.text[start:]
+
+
+def get_notify(msg):
+    return msg.reply_markup.inline_keyboard[-1][-1].callback_data.split(' ', 1)[-1]
+
+
+def get_user(
+    msg
+):
+    if msg.entities:
+        for entity in msg.entities:
+            if entity.type == 'text_mention':
+                return entity.user
