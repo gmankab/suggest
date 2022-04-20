@@ -42,7 +42,7 @@ api_hash: _
 main_chat: _
 
 # # # id of the chat in which you will confirm suggestions
-# confirming_chat: -673960405
+# confirming_chat: -703744909
 
 # database_log_chat: -607362670
 # bugreport_chat:
