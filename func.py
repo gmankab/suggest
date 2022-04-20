@@ -29,9 +29,6 @@ sys.path.append(
     libs_dir
 )
 
-import ruamel.yaml
-yml = ruamel.yaml.YAML()
-
 
 def mkdir(dir):
     if not os.path.isdir(dir):
@@ -94,13 +91,6 @@ def rmtree(dir):
         raise PermissionError(
             f'Can\'t remove dir "{dir}", no permissions. Try to remove it yourself'
         ) from error
-
-
-def load_ban_list():
-    if Path(ban_list_path).exists() and os.stat(ban_list_path).st_size != 0:
-        return yml.load(open(ban_list_path, 'r'))
-    else:
-        return []
 
 
 def get_text(

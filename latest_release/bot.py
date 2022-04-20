@@ -2,10 +2,12 @@ from init import config_create, cwd
 from dateutil.relativedelta import relativedelta
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+from pathlib import Path
 import ruamel.yaml
 import pyrogram
 import func as f
 import rich
+import os
 
 
 yml = ruamel.yaml.YAML()
@@ -16,9 +18,6 @@ config = config_create()
 cache = []
 
 
-ban_list_path = f'{cwd}/ban_list.yml'
-
-
 bot = pyrogram.Client(
     session_name = 'bot',
     bot_token = config['bot_token'],
@@ -27,10 +26,13 @@ bot = pyrogram.Client(
     workdir = cwd,
 )
 
-
 chats_blacklist = []
-ban_list = f.load_ban_list()
+ban_list_path = f'{cwd}/ban_list.yml'
 
+if Path(ban_list_path).exists() and os.stat(ban_list_path).st_size != 0:
+    ban_list =  yml.load(open(ban_list_path, 'r'))
+else:
+    ban_list =  []
 
 console = rich.console.Console()
 log = console.log
