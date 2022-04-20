@@ -5,6 +5,8 @@ print('starting...')
 
 
 def check_update():
+    if config['script_updates'] == 'disabled':
+        return
     url = 'https://raw.githubusercontent.com/gmankab/backupper/main/latest_release/backupper.py'
     script_b = r.urlopen(url).read()
     script = script_b.decode("utf8")
@@ -32,9 +34,6 @@ def check_update():
     restart()
 
 
-check_update()
-
-
 import sys
 
 
@@ -51,6 +50,9 @@ config = config_create(
     latest_supported_config,
     script_version,
 )
+
+
+
 
 
 import bot
