@@ -58,8 +58,8 @@ def auto_rename(file):
     return clean_path(Path(file.parent, new_name))
 
 
-def restart(*args):
-    command = f'{sys.executable} {sys.argv[0]} {" ".join(args)}'
+def restart():
+    command = f'{sys.executable} {sys.argv[0]}'
     globals().clear()
     import os as new_os
     import sys as new_sys
