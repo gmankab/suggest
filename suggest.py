@@ -32,6 +32,11 @@ def check_update():
         open(file, 'wb').write(bytes)
         print('done')
 
+    urls = (
+        'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/init.py',
+        'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/func.py',
+        'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/bot.py',
+    )
     main_b = get_bytes('https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/suggest.py')
     main_text = main_b.decode("utf8")
     begin = main_text.find("'") + 1
@@ -42,11 +47,7 @@ def check_update():
             __file__,
             main_b,
         )
-        for url in (
-            'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/init.py',
-            'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/func.py',
-            'https://raw.githubusercontent.com/gmankab/suggest/main/latest_release/bot.py',
-        ):
+        for url in urls:
             filename = url.rsplit('/', 1)[-1]
             file = f'{__file__}/../{filename}'
             rewrite(
@@ -57,6 +58,16 @@ def check_update():
             )
         print('done, restartind!')
         restart()
+    for url in urls:
+        filename = url.rsplit('/', 1)[-1]
+        file = f'{__file__}/../{filename}'
+        if not Path(file).exists():
+            rewrite(
+                file,
+                get_bytes(
+                    url
+                )
+            )
 
 
 check_update()
