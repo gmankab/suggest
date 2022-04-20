@@ -1,10 +1,10 @@
 from init import config_create, cwd
 from dateutil.relativedelta import relativedelta
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 import ruamel.yaml
 import pyrogram
 import func as f
-import datetime
 import rich
 
 
@@ -68,34 +68,36 @@ async def dump_ban_list(
             'w',
         ),
     )
-    await bot.send_document(
-        chat_id = config['confirming_chat'],
-        document = ban_list_path,
-        caption = 'бан лист обновлен',
-    )
+    if 'database_log_chat' in config and config['database_log_chat']:
+        return await bot.send_document(
+            chat_id = config['database_log_chat'],
+            document = ban_list_path,
+        )
 
 
 async def is_banned(
     user_id,
 ):
-    now = datetime.datetime.now().replace(
+    now = datetime.now().replace(
         microsecond = 0,
     )
     updated = False
-    for user in ban_list.copy():
-        if user['time'] != 'forever':
-            if datetime.fromisoformat(user['time']) <  now:
-                ban_list.remove(user)
+    for item in ban_list.copy():
+        if item['time'] != 'forever':
+            if datetime.fromisoformat(item['time']) <  now:
+                ban_list.remove(item)
                 updated = True
-                if user['id'] == user_id:
+                if item['user'] == user_id:
                     await dump_ban_list(ban_list)
                     return False
         if updated:
             await dump_ban_list(ban_list)
-        if user['id'] == user_id:
-            if user['time'] != 'forever':
+        if item['user'] == user_id:
+            if item['time'] == 'forever':
                 return 'forever'
-            return datetime.fromisoformat(user['time']) - now
+            return datetime.fromisoformat(
+                item['time']
+            ) - now
     if updated:
         await dump_ban_list(ban_list)
     return False
@@ -106,10 +108,10 @@ async def forward(
     target,
 ):
     if msg.media_group_id:
-        now = datetime.datetime.now().replace(
+        now = datetime.now().replace(
         microsecond = 0
     )
-        deadline = now - datetime.timedelta(
+        deadline = now - timedelta(
             seconds = 3
         )
         if cache:
@@ -256,8 +258,6 @@ async def on_message(
     chat = msg.chat.id
     if chat in chats_blacklist:
         return
-    # log(f'forwarding message {msg} from {f.get_username(msg.from_user)} to confirming_chat {config["confirming_chat"]}')
-
     await (
         await forward(
             msg,
@@ -313,7 +313,6 @@ async def publish(
     _,
     cb,
 ):
-    log(get_first_button(cb.message))
     await cb.message.edit(
         text = f'{f.get_text(cb.message)}\n✅Админ {cb.from_user.mention()} опубликовал пост, юзер получил уведомление.',
         reply_markup = get_first_button(cb.message),
@@ -365,7 +364,7 @@ async def unban(
         reply_markup = InlKb([[Buttons.open_ban_menu]])
     else:
         reply_markup = Buttons.publish(
-            notify = f.get_notify(cb.message.reply_to_message),
+            notify = f.get_notify(cb.message),
             ban_button = Buttons.open_ban_menu,
         )
     await cb.message.edit(
@@ -377,7 +376,7 @@ async def unban(
         text = '❤️Хорошие новости, ты разбанен',
         chat_id = user.id,
     )
-    now = datetime.datetime.now().replace(
+    now = datetime.now().replace(
         microsecond = 0,
     )
     for item in ban_list.copy():
@@ -401,7 +400,7 @@ async def ban(
     await cb.message.delete()
     ban_time = cb.data.split(' ', 1)[-1]
     time = None
-    now = datetime.datetime.now().replace(
+    now = datetime.now().replace(
         microsecond = 0,
     )
     match ban_time:
@@ -450,7 +449,6 @@ async def ban(
     for i in ban_list:
         if i['user'] == user.id:
             i['time'] = time
-            log(time)
             await dump_ban_list(ban_list)
             return
     ban_list.append(
@@ -483,13 +481,34 @@ async def suggest(
     _,
     cb,
 ):
-    time = is_banned(cb.from_user.id)
+    msg = cb.message
+    await msg.edit(
+        'отправляю пост...'
+    )
+    time = await is_banned(cb.from_user.id)
     if time:
-        cb.edit_message_text(
-            text = f'💀К сожалению, ты сейчас забанен. Разбан через {time}'
+        if time == 'forever':
+            text = '💀К сожалению, ты забанен навсегда'
+        else:
+            text = '💀К сожалению, ты сейчас забанен. Разбан через'
+            days = time.days
+            hours = time.seconds // 3600
+            minutes = (time.seconds // 60) % 60
+            seconds = time.seconds % 60
+            if days:
+                text += f' {days} дней'
+            if hours:
+                text += f' {hours} часов'
+            if minutes:
+                text += f' {minutes} минут'
+            if seconds:
+                text += f' {seconds} секунд'
+        await msg.edit(
+            text = text
         )
+        return
 
-    await cb.message.edit(
+    await msg.edit(
         text = '⌛Пост отправлен. Я пришлю тебе уведомление, когда его опубликуют, или отклонят'
     )
     notify = f'{cb.message.chat.id}/{cb.message.reply_to_message.message_id}'

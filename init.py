@@ -38,25 +38,20 @@ api_hash: _
 # You can find ID of any chat in your browser's address bar at https://web.telegram.org/z/. It must be number without letters.
 # WARNING: if ID have "-" sign at the beginning then you must add "100" after "-". For example, you must use "-100154636" instead of "-154636". Also if it hasn't "-" sign then you don't need to touch it. For example, it can be "38523532", "1348592", or "-100954843". If you want to use your account's "saved messages", input "me". Or you can use @name, of any user, chanel or chat
 
-# id of the chat in which confirmed suggestions will be published
+# # # id of the chat in which confirmed suggestions will be published
 main_chat: _
 
-# id of the chat in which you will confirm suggestions
-confirming_chat: _
+# # # id of the chat in which you will confirm suggestions
+# confirming_chat: -673960405
 
-log_chat:
-bugreport_chat:
+# database_log_chat: -607362670
+# bugreport_chat:
 
 
 # # # SCRIPT UPDATES
 script_updates: automatic
 # script_updates: disabled
 # script_updates: ask
-
-
-admins:
-- gmankab
-- ghwhwhwh
 
 
 # # # WARNING: DON'T TOUCH VERSION

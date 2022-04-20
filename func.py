@@ -1,5 +1,4 @@
 from pathlib import Path
-import datetime
 import shutil
 import stat
 import sys
@@ -54,7 +53,7 @@ def auto_rename(file):
     new_name = file.name
     while new_name in ls:
         count += 1
-        new_name = f'{file.stem}{count}{file.suffix}'
+        new_name = f'{file.parent}/{file.stem}{count}{file.suffix}'
     os.rename(file, new_name)
     return clean_path(Path(file.parent, new_name))
 
