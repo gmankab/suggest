@@ -347,7 +347,6 @@ async def open_ban_menu(
     cb,
 ):
     await cb.answer()
-    user = cb.message.entities[0].user
     await cb.message.reply(
         text = f'Админ {cb.from_user.mention()} открыл меню для бана.',
         reply_markup = Buttons.ban_menu
@@ -377,13 +376,13 @@ async def unban(
     user = f.get_user(cb.message)
     await bot.send_message(
         text = '❤️Хорошие новости, ты разбанен',
-        chat_id = user.id,
+        chat_id = user,
     )
     now = datetime.now().replace(
         microsecond = 0,
     )
     for item in ban_list.copy():
-        if item['user'] == user.id:
+        if item['user'] == user:
             ban_list.remove(item)
         elif item['time'] != 'forever':
             if datetime.fromisoformat(item['time']) <  now:
@@ -447,16 +446,16 @@ async def ban(
     user = f.get_user(cb.message.reply_to_message)
     await bot.send_message(
         text = f'💀К сожалению, ты забанен {str_time}',
-        chat_id = user.id,
+        chat_id = user,
     )
     for i in ban_list:
-        if i['user'] == user.id:
+        if i['user'] == user:
             i['time'] = time
             await dump_ban_list(ban_list)
             return
     ban_list.append(
         {
-            'user': user.id,
+            'user': user,
             'time': time,
         }
     )
@@ -515,13 +514,16 @@ async def suggest(
         text = '⌛Пост отправлен. Я пришлю тебе уведомление, когда его опубликуют, или отклонят'
     )
     notify = f'{cb.message.chat.id}/{cb.message.reply_to_message.message_id}'
+    text = f'⌛️Юзер {cb.from_user.id}'
+    if cb.from_user.username:
+        text += f' @{cb.from_user.username}'
     await (
         await forward(
         msg = cb.message.reply_to_message,
         target = config['confirming_chat'],
         )
     ).reply(
-        text = f'⌛️Юзер {cb.from_user.mention()} отправил этот пост в предложку.',
+        text = f'{text} отправил этот пост в предложку.',
         quote = True,
         reply_markup = Buttons.publish(
             notify = notify,

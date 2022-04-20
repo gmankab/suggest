@@ -104,7 +104,4 @@ def get_notify(msg):
 def get_user(
     msg
 ):
-    if msg.entities:
-        for entity in msg.entities:
-            if entity.type == 'text_mention':
-                return entity.user
+    return msg.text.split(' ', 2)[1]
