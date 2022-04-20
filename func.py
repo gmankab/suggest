@@ -21,15 +21,6 @@ def get_parrent_dir(file):
     )
 
 
-cwd = f'{get_parrent_dir(__file__)}/data'
-ban_list_path = f'{cwd}/ban_list.yml'
-libs_dir = f'{cwd}/libs'
-
-sys.path.append(
-    libs_dir
-)
-
-
 def mkdir(dir):
     if not os.path.isdir(dir):
         os.mkdir(dir)
