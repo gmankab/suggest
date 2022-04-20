@@ -261,16 +261,18 @@ async def on_message(
     chat = msg.chat.id
     if chat in chats_blacklist:
         return
-    await (
-        await forward(
-            msg,
-            chat,
-        )
-    ).reply(
-        text = 'Проверь этот пост, потому что его нельзя будет отредактировать или удалить',
-        quote = True,
-        reply_markup = Buttons.suggest
+
+    forwarded = await forward(
+        msg,
+        chat,
     )
+
+    if forwarded:
+        await forwarded.reply(
+            text = 'Проверь этот пост, потому что его нельзя будет отредактировать или удалить',
+            quote = True,
+            reply_markup = Buttons.suggest
+        )
 
 
 @bot.on_callback_query(
